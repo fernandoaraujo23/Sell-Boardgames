@@ -1,0 +1,163 @@
+
+CREATE NONCLUSTERED INDEX [IX_DIM_TIME] ON [dbo].DIM_TIME
+(TIME_IDSK ASC)INCLUDE(TIME_DATE)
+drop index [IX_DIM_ORDERS]
+
+CREATE NONCLUSTERED INDEX [IX_DIM_ORDERS] ON [dbo].DIM_ORDERS
+(FULFILLMENT_STATUS_ID ASC,ORDER_CREATED_TIME_IDSK ASC,ORDER_CUSTOMER_ID ASC)INCLUDE(ORDER_TOTAL)  
+
+CREATE VIEW DASH_BASE_CUSTOMERS_ORDERS as
+WITH CTE_BASE_CUSTOMERS_ORDERS as (
+SELECT 	
+	CUSTOMER_ID,
+	TIME_DATE,
+	ORDER_TOTAL
+FROM
+	(select ORDER_TOTAL,ORDER_CREATED_TIME_IDSK,ORDER_CUSTOMER_ID from DIM_ORDERS  WITH(INDEX([IX_DIM_ORDERS])) where FULFILLMENT_STATUS_ID <> 3) o
+	INNER JOIN 
+		(select TIME_IDSK,TIME_DATE from DIM_TIME WITH(INDEX([IX_DIM_TIME])) 
+			WHERE
+			TIME_IDSK >= (select min(ORDER_CREATED_TIME_IDSK) from DIM_ORDERS) and 
+			TIME_IDSK < (select max(ORDER_CREATED_TIME_IDSK) from DIM_ORDERS)
+		) t on o.ORDER_CREATED_TIME_IDSK = t.TIME_IDSK
+	inner join DIM_CUSTOMERS c on o.ORDER_CUSTOMER_ID = c.CUSTOMER_IDSK
+) 
+select
+	CUSTOMER_ID,
+	TIME_DATE,
+	concat(year(TIME_DATE),' ',(case when month(TIME_DATE)<10 then '0' else'' end),month(TIME_DATE)) YEAR_MONTH,
+	concat(year(TIME_DATE),(case when month(TIME_DATE)<10 then '0' else'' end),month(TIME_DATE)) ORDER_YEAR_MONTH,
+	ROW_NUMBER() over(partition by CUSTOMER_ID order by CUSTOMER_ID,TIME_DATE) NUMBER_PURCHASE,
+	LAG(CUSTOMER_ID, 1) over(order by CUSTOMER_ID,TIME_DATE) AS LAST_CUSTOMER,
+	LAG(TIME_DATE, 1) over(order by CUSTOMER_ID,TIME_DATE) AS LAST_SELL,
+	LEAD(CUSTOMER_ID, 1) over(order by CUSTOMER_ID,TIME_DATE) AS NEXT_CUSTOMER,
+	LEAD(TIME_DATE, 1) over(order by CUSTOMER_ID,TIME_DATE) AS NEXT_SELL,
+	ORDER_TOTAL 
+from
+	CTE_BASE_CUSTOMERS_ORDERS
+
+CREATE VIEW DASH_REPEATING_USERS as
+select 
+	CUSTOMER_ID,
+	count(CUSTOMER_ID) PURCHASES_LAST360DAYS 
+from 
+	DASH_BASE_CUSTOMERS_ORDERS 
+where 
+	DATEDIFF(day,time_date,getdate()) <= 360 
+group by 
+	CUSTOMER_ID 
+having 
+	count(CUSTOMER_ID)>=3
+
+CREATE VIEW DASH_PURCHASE_NEW_USERS as
+select 
+	t.CUSTOMER_ID,
+	sum(ORDER_TOTAL) ORDER_TOTAL 
+from 
+	DASH_BASE_CUSTOMERS_ORDERS t 
+	inner join
+		(
+		select 
+			CUSTOMER_ID 
+		from 
+			DASH_BASE_CUSTOMERS_ORDERS 
+		where 
+			NUMBER_PURCHASE = 1 
+			and DATEDIFF(day,time_date,getdate()) <= 360
+		) t1 on t.CUSTOMER_ID = t1.CUSTOMER_ID
+group by 
+	t.CUSTOMER_ID 
+
+CREATE VIEW DASH_MOVING_12M as
+select 
+	YEAR_MONTH,
+	ORDER_YEAR_MONTH,
+	isnull(ORDERS,0) ORDERS,
+	isnull(LAG(ORDERS, 1) over(order by YEAR_MONTH),0) AS ORDERS_1,
+	isnull(LAG(ORDERS, 2) over(order by YEAR_MONTH),0) AS ORDERS_2,
+	isnull(LAG(ORDERS, 3) over(order by YEAR_MONTH),0) AS ORDERS_3,
+	isnull(LAG(ORDERS, 4) over(order by YEAR_MONTH),0) AS ORDERS_4,
+	isnull(LAG(ORDERS, 5) over(order by YEAR_MONTH),0) AS ORDERS_5,
+	isnull(LAG(ORDERS, 6) over(order by YEAR_MONTH),0) AS ORDERS_6,
+	isnull(LAG(ORDERS, 7) over(order by YEAR_MONTH),0) AS ORDERS_7,
+	isnull(LAG(ORDERS, 8) over(order by YEAR_MONTH),0) AS ORDERS_8,
+	isnull(LAG(ORDERS, 9) over(order by YEAR_MONTH),0) AS ORDERS_9,
+	isnull(LAG(ORDERS, 10) over(order by YEAR_MONTH),0) AS ORDERS_10,
+	isnull(LAG(ORDERS, 11) over(order by YEAR_MONTH),0) AS ORDERS_11,
+	isnull(ORDERS,0)+
+	isnull(LAG(ORDERS, 1) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 2) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 3) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 4) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 5) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 6) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 7) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 8) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 9) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 10) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 11) over(order by YEAR_MONTH),0) AS TOTAL_12M ,
+	(isnull(ORDERS,0)+
+	isnull(LAG(ORDERS, 1) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 2) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 3) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 4) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 5) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 6) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 7) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 8) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 9) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 10) over(order by YEAR_MONTH),0)+
+	isnull(LAG(ORDERS, 11) over(order by YEAR_MONTH),0))/12 AS AVG_12M,
+	(case when isnull(LAG(ORDERS, 1) over(order by YEAR_MONTH),0) = 0 then 0 else isnull(ORDERS,0)/isnull(LAG(ORDERS, 1) over(order by YEAR_MONTH),0)-1 end) AS DELTA_MONTH
+from
+	(
+	SELECT 	
+		YEAR_MONTH,
+		ORDER_YEAR_MONTH,
+		sum(ORDER_TOTAL) ORDERS
+	FROM
+		DASH_BASE_CUSTOMERS_ORDERS
+	group by
+		YEAR_MONTH,
+		ORDER_YEAR_MONTH
+	) t
+
+CREATE VIEW DASH_GA_AGGREGATE as
+select 
+	GA_CATEGORY,
+	GA_VALUE,
+	GA_URL_CLEAR,
+	sum(GA_ENTRANCES) TOTAL_GA_ENTRANCES,
+	sum(GA_SESSIONS) TOTAL_GA_SESSIONS,
+	sum(GA_BOUNCES) TOTAL_GA_BOUNCES,
+	sum(GA_CLICKS) TOTAL_GA_CLICKS,
+	sum(GA_IMPRESSIONS) TOTAL_GA_IMPRESSIONS,
+	sum(GA_TIME_ON_PAGE) TOTAL_GA_TIME_ON_PAGE,
+	sum(GA_PAGEVIEWS) TOTAL_GA_PAGEVIEWS,
+	sum(GA_EXITS) TOTAL_GA_EXITS,
+	avg(GA_ENTRANCES) AVG_GA_ENTRANCES,
+	avg(GA_SESSIONS) AVG_GA_SESSIONS,
+	avg(GA_BOUNCES) AVG_GA_BOUNCES,
+	avg(GA_CLICKS) AVG_GA_CLICKS,
+	avg(GA_IMPRESSIONS) AVG_GA_IMPRESSIONS,
+	avg(GA_TIME_ON_PAGE) AVG_GA_TIME_ON_PAGE,
+	avg(GA_PAGEVIEWS) AVG_GA_PAGEVIEWS,
+	avg(GA_EXITS) AVG_GA_EXITS
+from 
+	DW_FACT_GA
+group by 
+	GA_CATEGORY,
+	GA_VALUE,
+	GA_URL_CLEAR
+
+CREATE VIEW DASH_GA_AGGREGATE_PARETO as
+select 
+	GA_VALUE,
+	TOTAL_GA_SESSIONS,
+	PCT_SESSION,
+	TOTAL_PCT_SESSION,
+	PARETO
+from 
+	teste_CTE_GA_AGGREGATE t1 
+	inner join teste_CTE_GA_AGGREGATE_2 t2 on t1.linha = t2.linha
+GO
