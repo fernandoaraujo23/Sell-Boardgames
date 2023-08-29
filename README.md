@@ -12,7 +12,6 @@ the fictional company Sell Boardgames would do in his daily work.
 - Phase 04: Reporting Services
 - Phase 05: Backup Structure
 - Phase 06: Power BI
-- Phase 07: Data Analysis and Executive Presentation
 
 For the development of the business intelligence project, Python and tools from
 the Microsoft data environment was used, namely: SQL Server, Management Studio,
@@ -26,18 +25,14 @@ Dimension (SCD) - Data Warehouse - Importing data from JSON and CSV – ETL -
 Integration Services (SSIS) - Time Dimension – Python – Pandas – Numpy – PyODBC -
 Bulk Insert - Analysis Services (SSAS) - Star Schema - Stored Procedure – Cursors -
 Nonclustered Index - Stage Area - Error Handling - SQL Server Agent - Integration
-Services Catalogs - Reporting Services (SSRS) - Backup Structure - Batch Scripts - ABC
-Analysis - Common Table Expression (CTE) – Views - Data Analysis - PowerPoint
-Presentation - Project Requirements Document - Executive Presentation
+Services Catalogs - Reporting Services (SSRS) - Backup Structure - Batch Scripts - 
+Common Table Expression (CTE) – Views - Project Requirements Document
 
 ## Project Requirements Document
 This document is the most detailed document about the project. 
 
 https://github.com/fernandoaraujo23/Sell-Boardgames/blob/main/FreeProjectRevenue_FernandoAraujo.pdf
 
-## Executive Presentation
-This is the executive presentation, one of the main deliveries at the end of the project.
 
-https://github.com/fernandoaraujo23/Sell-Boardgames/blob/main/ExecutivePresentation_SellBoardgames_FernandoAraujo.pdf
 
 
